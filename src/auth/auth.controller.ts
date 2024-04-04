@@ -9,12 +9,15 @@ import {
     Req,
     UseInterceptors,
     ClassSerializerInterceptor,
+    UseGuards,
+    Put,
 } from "@nestjs/common"
 import {RegisterDto} from "./dtos/register.dto"
 import {UserService} from "src/user/user.service"
 import * as bcrypt from "bcryptjs"
 import {JwtService} from "@nestjs/jwt"
 import {Response, Request} from "express"
+import {AuthGuard} from "./auth.guard"
 
 @Controller()
 export class AuthController {
@@ -32,7 +35,7 @@ export class AuthController {
         return this.userService.save({
             ...data,
             password: hashed,
-            is_ambassador: false,
+            is_ambassador: body.is_ambassador || false,
         })
     }
     @Post("admin/login")
@@ -57,6 +60,7 @@ export class AuthController {
         }
     }
 
+    @UseGuards(AuthGuard)
     @UseInterceptors(ClassSerializerInterceptor)
     @Get("admin/user")
     async user(@Req() request: Request) {
@@ -65,5 +69,51 @@ export class AuthController {
         const user = await this.userService.findOne({where: {id: id}})
 
         return user
+    }
+
+    @UseGuards(AuthGuard)
+    @Post("admin/logout")
+    async logout(@Res({passthrough: true}) response: Response) {
+        response.clearCookie("jwt")
+
+        return {
+            message: "Success",
+        }
+    }
+
+    @UseGuards(AuthGuard)
+    @UseInterceptors(ClassSerializerInterceptor)
+    @Put("admin/users/info")
+    async updateInfo(
+        @Req() request: Request,
+        @Body("first_name") first_name: string,
+        @Body("last_name") last_name: string,
+        @Body("email") email: string,
+    ) {
+        const cookie = request.cookies["jwt"]
+        const {id} = await this.jwtService.verifyAsync(cookie)
+        await this.userService.update(id, {
+            first_name,
+            last_name,
+            email,
+        })
+
+        return this.userService.findOne({where: {id: id}})
+    }
+
+    @UseGuards(AuthGuard)
+    @Put("admin/users/password")
+    async updatePassword(@Req() request: Request, @Body("password") password: string, @Body("password_confirm") password_confirm: string) {
+        const cookie = request.cookies["jwt"]
+        const {id} = await this.jwtService.verifyAsync(cookie)
+
+        if (password !== password_confirm) {
+            throw new BadRequestException("Password do not match !!")
+        }
+        await this.userService.update(id, {
+            password: await bcrypt.hash(password, 12),
+        })
+
+        return this.userService.findOne({where: {id: id}})
     }
 }

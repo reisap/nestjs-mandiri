@@ -1,4 +1,16 @@
-import { Controller } from '@nestjs/common';
+import {Controller, Get} from "@nestjs/common"
+import {UserService} from "./user.service"
 
-@Controller('user')
-export class UserController {}
+@Controller()
+export class UserController {
+    constructor(private readonly userService: UserService) {}
+
+    @Get("admin/ambassador")
+    async ambassador() {
+        return this.userService.find({
+            where: {
+                is_ambassador: true,
+            },
+        })
+    }
+}
