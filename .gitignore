@@ -3,6 +3,8 @@
 /node_modules
 /build
 
+.idea
+.chat
 # Logs
 logs
 *.log
